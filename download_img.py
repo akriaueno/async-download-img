@@ -5,19 +5,21 @@ import requests
 from bs4 import BeautifulSoup
 
 
-async def async_download_img(urls):
+async def async_download_imgs(urls, loop):
     try:
-        for url in urls:
+        def async_download_img(url, loop):
             r = requests.get(url)
             file_name = url.split('/')[-1]
             file_path = f'async_{file_name}'
             with open(file_path, 'wb') as f:
                 f.write(r.content)
+        tasks = [loop.run_in_executor(None, async_download_img, url, loop) for url in urls]
+        return await asyncio.gather(*tasks)
     except Exception:
         pass
 
 
-def download_img(urls):
+def download_imgs(urls):
     try:
         for url in urls:
             r = requests.get(url)
@@ -50,10 +52,10 @@ if __name__ == '__main__':
     if input() in ['Y', 'y']:
         loop = asyncio.get_event_loop()
         async_start = time.time()
-        loop.run_until_complete(async_download_img(img_list))
+        loop.run_until_complete(async_download_imgs(img_list, loop))
         async_elapsed_time = time.time() - async_start
         normal_start = time.time()
-        download_img(img_list)
+        download_imgs(img_list)
         normal_elapsed_time = time.time() - normal_start
         print(f'async: {async_elapsed_time}[s]')
         print(f'normal: {normal_elapsed_time}[s]')
