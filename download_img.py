@@ -59,21 +59,21 @@ def format_img_srcs(img_srcs, url):
     regex = r'^http'
     pattern = re.compile(regex)
     url = url[:-1] if url[-1] == '/' else url
-    return [img_src if pattern.match(img_src) else f'{url}{img_src}' for img_src in img_srcs]
+    return [img_src if pattern.match(img_src) else f'{url}{img_src}'
+            for img_src in img_srcs]
 
 
 if __name__ == '__main__':
     img_list = get_img_list('https://news.google.com/')
     print(img_list)
     print(f'{len(img_list)} files will be downloaded')
-    print('continue ? [Y/n]')
-    if input() in ['Y', 'y']:
+    if input('continue ? [Y/n]') in ['Y', 'y']:
         start = time.time()
         loop = asyncio.get_event_loop()
         loop.run_until_complete(async_download_imgs(img_list, loop))
         elapsed_time = time.time() - start
-        print(f'{async}: {elapsed_time}[s]')
+        print(f'async: {elapsed_time}[s]')
         start = time.time()
         download_imgs(img_list)
         elapsed_time = time.time() - start
-        print(f'{normal}: {elapsed_time}[s]')
+        print(f'normal: {elapsed_time}[s]')
