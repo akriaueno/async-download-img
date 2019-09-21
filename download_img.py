@@ -4,32 +4,30 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
+MAX_CONNECTION = 1
 
-def timer(func):
-    if asyncio.iscoroutinefunction(func):
-        async def async_wrapper(*args, **kwargs):
-            start = time.time()
-            await func(*args, **kwargs)
-            elapsed_time = time.time() - start
-            print(f'{func.__name__}: {elapsed_time}[s]')
-        return async_wrapper
-    else:
-        def wrapper(*args, **kwargs):
-            start = time.time()
-            func(*args, **kwargs)
-            elapsed_time = time.time() - start
-            print(f'{func.__name__}: {elapsed_time}[s]')
-        return wrapper
+
+def download_img(url):
+    # TODO separete disk I/O from this func
+    # ???
+    # yeild r.content and push queue
+    # pop queue and write files asynchronously
+    # Semaphore may be bottleneck
+    # ???
+    r = requests.get(url, stream=True)
+    file_name = url.split('/')[-1]
+    file_path = f'async_{file_name}'
+    with open(file_path, 'wb') as f: f.write(r.content)
 
 
 async def async_download_imgs(urls, loop):
     try:
-        async def async_download_img(url):
-            r = requests.get(url)
-            file_name = url.split('/')[-1]
-            file_path = f'async_{file_name}'
-            with open(file_path, 'wb') as f:
-                f.write(r.content)
+        sem = asyncio.Semaphore(MAX_CONNECTION)
+
+        def async_download_img(url):
+            async with sem:
+                return loop.run_in_executor(None, download_img, url)
+
         cors = [async_download_img(url) for url in urls]
         return await asyncio.gather(*cors)
     except Exception:
@@ -39,11 +37,7 @@ async def async_download_imgs(urls, loop):
 def download_imgs(urls):
     try:
         for url in urls:
-            r = requests.get(url)
-            file_name = url.split('/')[-1]
-            file_path = f'normal_{file_name}'
-            with open(file_path, 'wb') as f:
-                f.write(r.content)
+            download_img(url)
     except Exception:
         pass
 
@@ -59,21 +53,23 @@ def format_img_srcs(img_srcs, url):
     regex = r'^http'
     pattern = re.compile(regex)
     url = url[:-1] if url[-1] == '/' else url
-    return [img_src if pattern.match(img_src) else f'{url}{img_src}' for img_src in img_srcs]
+    return [img_src if pattern.match(img_src)
+            else f'{url}{img_src}' for img_src in img_srcs]
 
 
 if __name__ == '__main__':
-    img_list = get_img_list('https://news.google.com/')
+    url = input('URL: ')
+    img_list = get_img_list(url)
     print(img_list)
     print(f'{len(img_list)} files will be downloaded')
     print('continue ? [Y/n]')
     if input() in ['Y', 'y']:
-        start = time.time()
         loop = asyncio.get_event_loop()
+        start = time.time()
         loop.run_until_complete(async_download_imgs(img_list, loop))
         elapsed_time = time.time() - start
-        print(f'{async}: {elapsed_time}[s]')
+        print(f'async: {elapsed_time}[s]')
         start = time.time()
         download_imgs(img_list)
         elapsed_time = time.time() - start
-        print(f'{normal}: {elapsed_time}[s]')
+        print(f'normal: {elapsed_time}[s]')
